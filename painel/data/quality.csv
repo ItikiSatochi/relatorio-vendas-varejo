@@ -1,0 +1,30 @@
+n,regra,linhas,tratamento,pct
+1,"Linhas duplicadas (Order_ID repetido, linha idêntica)",65,Removidas,0.0007
+2,Datas em formato DD-MM-YYYY,15,Convertidas para ISO,0.0002
+3,"Datas inválidas ('not recorded', '2025-14-40', '17/31/2025')",15,Removidas (sem data não há série temporal),0.0002
+4,Gender: grafias inconsistentes,7018,Padronizadas,0.078
+5,Gender: nulos,3154,Rotulados 'Não informado',0.0351
+6,City: grafias inconsistentes,4374,Padronizadas,0.0486
+7,City: nulos,2201,Rotulados 'Não informado',0.0245
+8,Customer_Segment: grafias inconsistentes,7240,Padronizadas,0.0805
+9,Customer_Segment: nulos,4118,Rotulados 'Não informado',0.0458
+10,Sales_Channel: grafias inconsistentes,4490,Padronizadas,0.0499
+11,Sales_Channel: nulos,1674,Rotulados 'Não informado',0.0186
+12,Payment_Method: grafias inconsistentes,8177,Padronizadas,0.0909
+13,Payment_Method: nulos,5956,Rotulados 'Não informado',0.0662
+14,Marketing_Channel: grafias inconsistentes,9523,Padronizadas,0.1058
+15,Marketing_Channel: nulos,7614,Rotulados 'Não informado',0.0846
+16,Product_Name: nulos,1671,Recuperados pelo mestre Product_ID,0.0186
+17,Product_Category: nulos,1079,Recuperados pelo mestre Product_ID,0.012
+18,Order_Status nulo com Return_Flag=Yes,104,Inferido 'Returned',0.0012
+19,Order_Status nulo restante,1915,Rotulado 'Não informado',0.0213
+20,"Idade fora de 16–90 (0, 132…)",30,Anulada (não imputada),0.0003
+21,"Rating fora de 1–5 (-1, 0, 6, 7)",25,Anulado,0.0003
+22,"Quantity ≤0, >20 ou nula (ex.: 83, 114, -3)",1051,970 reconciliadas via Sales_Amount; resto = mediana do produto,0.0117
+23,Unit_Price negativo/zero ou >3× P99 do produto,2554,Recalculado: preço = (Sales_Amount − frete) ÷ (Qtd × (1−desc)),0.0284
+24,"Desconto fora de 0–60% (-5%, 125%)",25,Anulado,0.0003
+25,Discount_Percent nulo,4078,Mantido nulo (KPIs usam média ponderada sem nulos),0.0453
+26,Shipping_Cost nulo,6769,Mantido nulo; Sales_Amount confirma frete = 0,0.0752
+27,Profit_Margin nulo,3223,Imputado pela mediana do produto (marcado em Margin_Imputed),0.0358
+28,Customer_Rating nulo (pesquisa não respondida),22566,Mantido nulo; cobertura reportada,0.2508
+29,TOTAL,89984,"89904 linhas finais (80 removidas, 0.089%)",1.0

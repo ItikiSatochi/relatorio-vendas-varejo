@@ -36,8 +36,8 @@ header.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1p
 header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:10px;padding-bottom:10px}
 .brand{font-family:'Archivo',sans-serif;font-weight:600;font-size:15px}
 .tools{display:flex;gap:8px;align-items:center}
-button.tg{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
-button.tg[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.tg{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+.tg[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 nav.toc{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
 nav.toc a{flex:none;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px}
 nav.toc a:hover{color:var(--accent);border-color:var(--accent)}
@@ -79,7 +79,7 @@ tr:last-child td{border-bottom:0}
 footer{padding:32px 0 48px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
 .money{transition:filter .2s}
 body.anon .money{filter:blur(6px);user-select:none}
-@media (max-width:600px){ .hero{padding-top:32px} .brand{font-size:13px} .kpi .v{font-size:24px} }
+@media (max-width:600px){ .hero{padding-top:32px} .brand{display:none} header.top .wrap{justify-content:flex-end} .kpi .v{font-size:24px} }
 </style>
 </head>
 <body>
@@ -87,6 +87,7 @@ body.anon .money{filter:blur(6px);user-select:none}
   <div class="wrap">
     <span class="brand">Relatório de Vendas no Varejo</span>
     <div class="tools">
+      <a class="tg" href="painel/" style="text-decoration:none;border-color:var(--accent);color:var(--accent)">Painel dinâmico</a>
       <button class="tg" id="anonBtn" aria-pressed="false" title="Oculta os valores absolutos em rúpias">Ocultar valores</button>
       <button class="tg" id="themeBtn" aria-label="Alternar tema">Tema</button>
     </div>
@@ -105,7 +106,7 @@ body.anon .money{filter:blur(6px);user-select:none}
   <span class="eyebrow">Advanced Data Analytics · Análise preventiva</span>
   <h1>24 meses de vendas: o que cresceu, o que encolheu e onde agir primeiro</h1>
   <p class="lead">Base de 89.904 pedidos (jan/2024 a dez/2025), tratada com 29 regras auditáveis, analisada com controle estatístico e convertida em 11 riscos, cada um com um gatilho de alerta.</p>
-  <p class="meta">Diego Satochi · Valores em rúpias (Rs) · Receita líquida exclui pedidos cancelados, devolvidos, estornados e com devolução solicitada.</p>
+  <p class="meta">Diego Satochi · <a href="painel/" style="color:var(--accent)">Abrir o painel dinâmico com filtros</a> · Valores em rúpias (Rs) · Receita líquida exclui pedidos cancelados, devolvidos, estornados e com devolução solicitada.</p>
 </div>
 
 <section id="sumario"><div class="wrap">

@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Vendas no Varejo · Diego Satochi</title>
+<meta name="description" content="Painel dinâmico de 24 meses de vendas no varejo: KPIs com filtros, faixa de controle, riscos com gatilho de alerta, previsão e auditoria de qualidade dos dados.">
+<meta property="og:title" content="Painel de Vendas no Varejo · Diego Satochi">
+<meta property="og:description" content="89.904 pedidos, 5 filtros, 3 abas: visão executiva, riscos e alertas, qualidade dos dados.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="d3.min.js"></script>
+<style>
+:root{
+  --font-anthropic-sans:'IBM Plex Sans',system-ui,sans-serif; --font-anthropic-serif:'Archivo','IBM Plex Sans',sans-serif;
+  --cds-gap-xs:4px; --cds-gap-sm:8px; --cds-gap-md:12px; --cds-gap-lg:20px;
+  --cds-pad-xs:4px; --cds-pad-sm:8px; --cds-pad-md:12px; --cds-pad-lg:16px;
+  --cds-radius:10px; --cds-font-size-caption:13px; --cds-font-size-body:15px; --cds-font-size-heading:17px; --cds-font-size-title:28px;
+  --cds-font-weight-medium:500; --cds-dur-slow:.3s;
+  --bg:#F5F7FA; --color-fg:#1B2230; --color-fg-muted:#4E596B; --color-panel:#FFFFFF; --color-border-line:#DCE2EA;
+  --color-ok:#1E7A4C; --color-bad:#B3261E; --color-warn:#A86200;
+  --cds-chart-grid:#E8ECF2; --cds-chart-axis:#8A97AB; --cds-chart-muted:#9AA5B5; --cds-chart-reference:#2F6FDB; --cds-chart-status-critical:#C62828;
+  --cds-surface-popover:#FFFFFF; --cds-border:#DCE2EA; --cds-shadow-popover:0 6px 20px rgba(20,30,50,.14); --cds-text-secondary:#4E596B;
+  --c1:#2F6FDB; --c2:#E07B39;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1726; --color-fg:#F2F5F9; --color-fg-muted:#A9B4C4; --color-panel:#121E31; --color-border-line:#26344A;
+    --color-ok:#5BD08F; --color-bad:#FF8A6B; --color-warn:#F2B84B;
+    --cds-chart-grid:#1E2B40; --cds-chart-axis:#6B778A; --cds-chart-muted:#6B778A; --cds-chart-reference:#3FA9F5; --cds-chart-status-critical:#FF6B57;
+    --cds-surface-popover:#16243A; --cds-border:#26344A; --cds-shadow-popover:0 6px 20px rgba(0,0,0,.45); --cds-text-secondary:#A9B4C4;
+    --c1:#3FA9F5; --c2:#F2994A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1726; --color-fg:#F2F5F9; --color-fg-muted:#A9B4C4; --color-panel:#121E31; --color-border-line:#26344A;
+  --color-ok:#5BD08F; --color-bad:#FF8A6B; --color-warn:#F2B84B;
+  --cds-chart-grid:#1E2B40; --cds-chart-axis:#6B778A; --cds-chart-muted:#6B778A; --cds-chart-reference:#3FA9F5; --cds-chart-status-critical:#FF6B57;
+  --cds-surface-popover:#16243A; --cds-border:#26344A; --cds-shadow-popover:0 6px 20px rgba(0,0,0,.45); --cds-text-secondary:#A9B4C4;
+  --c1:#3FA9F5; --c2:#F2994A;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--color-fg);font:15px/1.5 var(--font-anthropic-sans)}
+.shell-top{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;margin:0 auto;padding:12px 16px;font-size:13px}
+.shell-top a{color:var(--color-fg-muted);text-decoration:none} .shell-top a:hover{color:var(--cds-chart-reference)}
+.shell-top button{font:inherit;color:var(--color-fg);background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:999px;padding:5px 12px;cursor:pointer}
+#dash-root{max-width:1200px;margin:0 auto;padding:8px 16px 48px}
+.vx-title{font-weight:800 !important;letter-spacing:-.01em}
+.dash-skeleton{min-height:12rem}
+.vx-tile-value{font-size:24px !important;white-space:nowrap}
+.shell-foot{max-width:1200px;margin:0 auto;padding:16px 16px 40px;font-size:13px;color:var(--color-fg-muted)}
+</style>
+<script>
+/* Runtime mínimo que substitui o ambiente do painel: carrega os CSVs, guarda os filtros na URL e recalcula os datasets derivados. */
+(function(){
+  var SOURCES=['kpi_slices','monthly_slices','product_slices','forecast','discount_bands','rating_returns','seasonality','quality','customers','alerts'];
+  var store={}, calcs={}, listeners=[];
+  SOURCES.forEach(function(n){store[n]={status:'loading',data:[]};});
+  function emit(){listeners.forEach(function(f){try{f();}catch(e){console.error(e);}});}
+  function runCalcs(){
+    Object.keys(calcs).forEach(function(n){
+      var c=calcs[n], ins=c.inputs.map(function(i){return store[i];});
+      if(ins.some(function(s){return s.status==='error';})) store[n]={status:'error',data:[]};
+      else if(ins.every(function(s){return s.status==='ok';})){ if(store[n].status!=='ok') store[n]={status:'ok',data:c.fn.apply(null,ins.map(function(s){return s.data;}))}; }
+      else store[n]={status:'loading',data:[]};
+    });
+  }
+  var DEFAULTS={year:'2025'};
+  function readParams(){var o={};Object.keys(DEFAULTS).forEach(function(k){o[k]=DEFAULTS[k];});new URLSearchParams(location.search).forEach(function(v,k){o[k]=v;});return o;}
+  function writeParams(o){
+    var q=new URLSearchParams();Object.keys(o).forEach(function(k){var d=DEFAULTS[k]||'Todos';if(o[k]&&o[k]!==d)q.set(k,o[k]);});
+    var s=q.toString();history.replaceState(null,'',location.pathname+(s?'?'+s:'')+location.hash);
+  }
+  var css=function(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();};
+  window.dash={
+    get colors(){return [css('--c1')||'#2F6FDB',css('--c2')||'#E07B39'];},
+    data:function(n){return store[n]||{status:'error',data:[]};},
+    onData:function(f){listeners.push(f);},
+    calc:function(n,spec){calcs[n]=spec;store[n]={status:'loading',data:[]};runCalcs();},
+    params:readParams,
+    setParams:function(p){var o=readParams();Object.keys(p).forEach(function(k){o[k]=p[k];});writeParams(o);emit();},
+    resetParams:function(){writeParams({});emit();},
+    setLink:function(id){history.replaceState(null,'',location.pathname+location.search+'#'+id);}
+  };
+  window.addEventListener('DOMContentLoaded',function(){
+    SOURCES.forEach(function(n){
+      d3.csv('data/'+n+'.csv').then(function(rows){store[n]={status:'ok',data:rows};runCalcs();emit();})
+        .catch(function(){store[n]={status:'error',data:[]};runCalcs();emit();});
+    });
+    var root=document.documentElement,btn=document.getElementById('themeBtn');
+    try{var t=localStorage.getItem('theme');if(t)root.setAttribute('data-theme',t);}catch(e){}
+    btn.onclick=function(){
+      var dark=root.getAttribute('data-theme')?root.getAttribute('data-theme')==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+      var n=dark?'light':'dark';root.setAttribute('data-theme',n);try{localStorage.setItem('theme',n);}catch(e){}
+      document.querySelector('.vx').style.setProperty('--vx-accent',dash.colors[0]);emit();
+    };
+    var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(emit,150);});
+  });
+})();
+</script>
+</head>
+<body>
+<div class="shell-top"><a href="../">← Relatório completo</a><button id="themeBtn" type="button" aria-label="Alternar tema">Tema</button></div>
+<main id="dash-root">
+<style>
+.vx { display: grid; gap: var(--cds-gap-lg); font-family: var(--font-anthropic-sans); font-variant-numeric: tabular-nums; }
+.vx-head { display: grid; gap: var(--cds-gap-xs); }
+.vx-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.vx-take { margin: 0; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); max-width: 70ch; }
+.vx-take b { font-weight: 600; color: var(--color-fg); }
+.vx-filters { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: end; }
+.vx-filters label { display: grid; gap: 2px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.vx-filters select { min-width: 9rem; max-width: 100%; padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); color: var(--color-fg); font: inherit; font-size: var(--cds-font-size-body); }
+.vx-btn { padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: transparent; color: var(--color-fg); font: inherit; cursor: pointer; }
+.vx-btn:hover { background: var(--color-panel); }
+.vx-btn:focus-visible, .vx-tab:focus-visible, .vx-filters select:focus-visible { outline: 2px solid var(--cds-chart-reference); outline-offset: 2px; }
+.vx-tabs { display: flex; gap: var(--cds-gap-xs); border-bottom: 1px solid var(--color-border-line); overflow-x: auto; }
+.vx-tab { padding: var(--cds-pad-sm) var(--cds-pad-md); border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-fg-muted); font: inherit; font-size: var(--cds-font-size-body); cursor: pointer; white-space: nowrap; }
+.vx-tab[aria-selected="true"] { color: var(--color-fg); border-bottom-color: var(--color-fg); font-weight: 600; }
+.vx-page { display: grid; gap: var(--cds-gap-lg); }
+.vx-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: var(--cds-gap-md); }
+.vx-tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md) var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); align-content: start; min-width: 0; }
+.vx-tile-label { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.vx-tile-value { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; min-height: 1.1em; }
+.vx-tile-delta { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-height: 1.3em; }
+.vx-up { color: var(--color-ok); } .vx-down { color: var(--color-bad); } .vx-flat { color: var(--color-fg-muted); }
+.vx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--cds-gap-md); }
+.vx-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-sm); align-content: start; min-width: 0; }
+.vx-card h3 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+.vx-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.vx-wide { grid-column: 1 / -1; }
+.vx-chart { position: relative; min-height: 260px; }
+.vx-chart.sm { min-height: 200px; }
+.vx-chart svg { display: block; overflow: visible; }
+.vx-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+.vx-tip .k { color: var(--cds-text-secondary); }
+.vx-bars { display: grid; gap: 6px; }
+.vx-bar { display: grid; grid-template-columns: minmax(6rem, 9rem) 1fr auto; gap: var(--cds-gap-sm); align-items: center; font-size: var(--cds-font-size-caption); background: none; border: 0; padding: 2px 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+.vx-bar:hover .vx-bar-fill { opacity: .85; }
+.vx-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vx-bar-track { height: 14px; border-radius: 4px; background: var(--cds-chart-grid); overflow: hidden; }
+.vx-bar-fill { height: 100%; border-radius: 4px; background: var(--cds-chart-muted); }
+.vx-bar.on .vx-bar-fill { background: var(--vx-accent); }
+.vx-bar-val { min-width: 7.5rem; text-align: right; }
+.vx-bar-val small { color: var(--color-fg-muted); }
+.vx-tablebox { max-height: 26rem; overflow: auto; }
+.vx-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); }
+.vx-table th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--color-border-line); }
+.vx-table th button { all: unset; cursor: pointer; }
+.vx-table th.n, .vx-table td.n { text-align: right; }
+.vx-table td { padding: 6px 8px; border-bottom: 1px solid var(--cds-chart-grid); vertical-align: top; }
+.vx-table td.txt { min-width: 14rem; max-width: 28rem; white-space: normal; }
+.vx-inbar { display: grid; grid-template-columns: 1fr 5.5rem; gap: 6px; align-items: center; }
+.vx-inbar span { height: 8px; border-radius: 4px; background: var(--vx-accent); opacity: .7; }
+.vx-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: var(--cds-font-size-caption); font-weight: 600; border: 1px solid currentColor; white-space: nowrap; }
+.vx-pill.s1 { color: var(--color-bad); } .vx-pill.s2 { color: var(--color-warn); } .vx-pill.s3 { color: var(--color-fg); } .vx-pill.s4 { color: var(--color-fg-muted); }
+.vx-search { padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: transparent; color: var(--color-fg); font: inherit; max-width: 16rem; }
+.vx-fail { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.vx-fail::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.vx-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.vx-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+@media (max-width: 520px) { .vx-bar { grid-template-columns: 5.5rem 1fr auto; } .vx-bar-val { min-width: 6rem; } }
+</style>
+
+<div class="vx">
+  <header class="vx-head">
+    <h1 class="vx-title" id="topo">Painel de Vendas no Varejo</h1>
+    <p class="vx-take" id="takeaway" data-source="kpi_slices kpi_delta"></p>
+  </header>
+
+  <div class="vx-filters" id="filtros" data-source="kpi_slices">
+    <label for="f-year">Ano<select id="f-year" data-p="year"></select></label>
+    <label for="f-region">Região<select id="f-region" data-p="region"></select></label>
+    <label for="f-category">Categoria<select id="f-category" data-p="category"></select></label>
+    <label for="f-channel">Canal de venda<select id="f-channel" data-p="channel"></select></label>
+    <label for="f-segment">Segmento<select id="f-segment" data-p="segment"></select></label>
+    <button class="vx-btn" id="f-reset" type="button">Limpar filtros</button>
+  </div>
+
+  <nav class="vx-tabs" role="tablist" aria-label="Páginas">
+    <button class="vx-tab" role="tab" data-tab="visao" id="tab-visao">Visão executiva</button>
+    <button class="vx-tab" role="tab" data-tab="riscos" id="tab-riscos">Riscos e alertas</button>
+    <button class="vx-tab" role="tab" data-tab="qualidade" id="tab-qualidade">Qualidade dos dados</button>
+  </nav>
+
+  <section class="vx-page" id="visao">
+    <div class="vx-tiles" id="kpis"></div>
+
+    <div class="vx-grid">
+      <div class="vx-card vx-wide" id="card-mensal">
+        <h3>Receita líquida por mês e faixa de controle</h3>
+        <p class="vx-note">Receita líquida exclui pedidos cancelados, devolvidos e reembolsados. A faixa é a média ± 2 desvios-padrão da série exibida; pontos fora dela são sinal de alerta.</p>
+        <div class="vx-chart" id="ch-mensal" data-source="monthly_slices"></div>
+      </div>
+    </div>
+
+    <div class="vx-grid">
+      <div class="vx-card" id="card-regiao"><h3>Por região</h3><p class="vx-note">Receita líquida e margem. Clique para filtrar.</p><div class="vx-bars" id="br-region" data-source="kpi_slices"></div></div>
+      <div class="vx-card" id="card-categoria"><h3>Por categoria</h3><p class="vx-note">Receita líquida e margem. Clique para filtrar.</p><div class="vx-bars" id="br-category" data-source="kpi_slices"></div></div>
+      <div class="vx-card" id="card-canal"><h3>Por canal de venda</h3><p class="vx-note">Receita líquida e margem. Clique para filtrar.</p><div class="vx-bars" id="br-channel" data-source="kpi_slices"></div></div>
+      <div class="vx-card" id="card-segmento"><h3>Por segmento de cliente</h3><p class="vx-note">Receita líquida e margem. Clique para filtrar.</p><div class="vx-bars" id="br-segment" data-source="kpi_slices"></div></div>
+    </div>
+
+    <div class="vx-card" id="card-produtos">
+      <h3>Produtos</h3>
+      <p class="vx-note" id="prod-note">Variação anual disponível com o ano 2025 selecionado. Clique no cabeçalho para ordenar.</p>
+      <input class="vx-search" id="prod-q" type="search" placeholder="Buscar produto" aria-label="Buscar produto">
+      <div class="vx-tablebox">
+        <table class="vx-table" id="tb-prod" data-source="product_slices" data-row-key="key">
+          <thead><tr>
+            <th data-field="product"><button data-s="product">Produto</button></th>
+            <th data-field="category"><button data-s="category">Categoria</button></th>
+            <th class="n" data-field="net"><button data-s="net">Receita líquida</button></th>
+            <th class="n" data-field="margin"><button data-s="margin">Margem</button></th>
+            <th class="n" data-field="orders"><button data-s="orders">Pedidos</button></th>
+            <th class="n" data-field="ret"><button data-s="ret">Devolução</button></th>
+            <th class="n" data-field="yoy"><button data-s="yoy">vs 2024</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="vx-page" id="riscos" hidden>
+    <div class="vx-card" id="card-alertas">
+      <h3>Registro de riscos e gatilhos preventivos</h3>
+      <p class="vx-note">Cada risco tem um gatilho mensurável para virar alerta automático e uma ação preventiva. Base completa, sem filtros.</p>
+      <div class="vx-tablebox" style="max-height:34rem">
+        <table class="vx-table" id="tb-alerts" data-source="alerts" data-row-key="id">
+          <thead><tr>
+            <th data-field="severity">Severidade</th><th data-field="signal">Sinal</th>
+            <th data-field="evidence">Evidência</th><th data-field="trigger">Gatilho</th><th data-field="action">Ação preventiva</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="vx-grid">
+      <div class="vx-card vx-wide" id="card-previsao">
+        <h3>Previsão de receita líquida para o 1º trimestre de 2026</h3>
+        <p class="vx-note">Tendência linear dos 24 meses × índice sazonal do mês, com intervalo de 95%. Abaixo do limite inferior de controle, acionar plano de contingência.</p>
+        <div class="vx-chart" id="ch-prev" data-source="forecast"></div>
+        <div class="vx-legend" id="lg-prev"></div>
+      </div>
+      <div class="vx-card" id="card-sazonal">
+        <h3>Sazonalidade</h3>
+        <p class="vx-note">Índice do mês (100 = mês médio), média de 2024 e 2025.</p>
+        <div class="vx-chart sm" id="ch-saz" data-source="seasonality"></div>
+      </div>
+      <div class="vx-card" id="card-desconto">
+        <h3>Desconto contra margem e devolução</h3>
+        <p class="vx-note">Barras: margem média por faixa de desconto. Linha: taxa de devolução.</p>
+        <div class="vx-chart sm" id="ch-desc" data-source="discount_bands"></div>
+      </div>
+      <div class="vx-card" id="card-nota">
+        <h3>Nota do cliente antecipa devolução</h3>
+        <p class="vx-note">Taxa de devolução por nota atribuída ao pedido.</p>
+        <div class="vx-chart sm" id="ch-nota" data-source="rating_returns"></div>
+      </div>
+      <div class="vx-card" id="card-clientes">
+        <h3>Clientes e concentração</h3>
+        <p class="vx-note">Base completa de 24 meses.</p>
+        <div class="vx-tablebox">
+          <table class="vx-table" id="tb-cust" data-source="customers" data-row-key="metric">
+            <thead><tr><th data-field="label">Indicador</th><th class="n" data-field="value">Valor</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="vx-page" id="qualidade" hidden>
+    <div class="vx-card" id="card-qualidade">
+      <h3>Auditoria de tratamento dos dados</h3>
+      <p class="vx-note">Cada regra aplicada no ETL, quantas linhas atingiu e o tratamento. Linhas em % da base bruta.</p>
+      <div class="vx-tablebox" style="max-height:40rem">
+        <table class="vx-table" id="tb-qual" data-source="quality" data-row-key="n">
+          <thead><tr><th class="n" data-field="n">#</th><th data-field="regra">Regra</th><th class="n" data-field="linhas">Linhas</th><th class="n" data-field="pct">% da base</th><th data-field="tratamento">Tratamento</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const ALL = 'Todos';
+  const DIMS = ['year', 'region', 'category', 'channel', 'segment'];
+  const LABEL = { year: 'Todos os anos', region: 'Todas as regiões', category: 'Todas as categorias', channel: 'Todos os canais', segment: 'Todos os segmentos' };
+  const PT = { 'Online': 'Online', 'Retail Store': 'Loja física', 'Marketplace': 'Marketplace', 'Phone Order': 'Telefone',
+    'Returning': 'Recorrente', 'Loyal': 'Fiel', 'New': 'Novo', 'Corporate': 'Corporativo',
+    'Electronics': 'Eletrônicos', 'Clothing': 'Vestuário', 'Home & Kitchen': 'Casa e cozinha', 'Beauty': 'Beleza',
+    'Accessories': 'Acessórios', 'Toys & Games': 'Brinquedos e jogos', 'Office Supplies': 'Escritório', 'Stationery': 'Papelaria' };
+  const tr = (v) => PT[v] || v;
+  const num = (v) => (v === '' || v == null ? NaN : Number(v));
+  const nf = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+  const rs = (v) => (isFinite(v) ? 'Rs ' + nf.format(v) : '—');
+  const pct = (v, d = 1) => (isFinite(v) ? (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%' : '—');
+  const int = (v) => (isFinite(v) ? Math.round(v).toLocaleString('pt-BR') : '—');
+  const dec = (v) => (isFinite(v) ? v.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—');
+  const enc = (s) => encodeURIComponent(s);
+  const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const mLabel = (m) => MES[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4);
+  const css = (name) => getComputedStyle(document.getElementById('dash-root') || document.body).getPropertyValue(name).trim();
+
+  const root = document.querySelector('.vx');
+  root.style.setProperty('--vx-accent', dash.colors[0]);
+
+  dash.calc('kpi_delta', {
+    title: 'Variação 2025 vs 2024',
+    description: 'Para cada fatia de 2025, variação percentual (receita, lucro, pedidos, ticket) e em pontos (margem, perda) contra a mesma fatia de 2024.',
+    inputs: ['kpi_slices'],
+    fn: (kpi_slices) => kpi_slices.filter((r) => r.year === '2025' && r.net_py !== '').map((r) => ({
+      key: r.key,
+      d_net: Number(r.net) / Number(r.net_py) - 1,
+      d_profit: Number(r.profit) / Number(r.profit_py) - 1,
+      d_orders: Number(r.orders) / Number(r.orders_py) - 1,
+      d_aov: Number(r.aov) / Number(r.aov_py) - 1,
+      d_margin: Number(r.margin) - Number(r.margin_py),
+      d_lost: Number(r.lost) - Number(r.lost_py),
+    })),
+  });
+
+  const P = () => { const p = dash.params(); const o = {}; DIMS.forEach((d) => (o[d] = p[d] || ALL)); return o; };
+  const keyOf = (o) => DIMS.map((d) => o[d]).join('|');
+
+  // ---------- filtros ----------
+  const sels = [...document.querySelectorAll('.vx-filters select')];
+  sels.forEach((s) => s.addEventListener('change', () => dash.setParams({ [s.dataset.p]: s.value })));
+  document.getElementById('f-reset').addEventListener('click', () => dash.resetParams());
+  let optsFor = null;
+  const fillFilters = (rows) => {
+    if (optsFor !== rows) {
+      optsFor = rows;
+      sels.forEach((s) => {
+        const d = s.dataset.p;
+        const vals = [...new Set(rows.map((r) => r[d]))].filter((v) => v !== ALL).sort((a, b) => (a === 'Não informado') - (b === 'Não informado') || a.localeCompare(b));
+        s.replaceChildren(new Option(LABEL[d], ALL), ...vals.map((v) => new Option(tr(v), v)));
+      });
+    }
+    const p = P();
+    sels.forEach((s) => { s.value = p[s.dataset.p]; });
+  };
+
+  // ---------- abas ----------
+  const tabs = [...document.querySelectorAll('.vx-tab')];
+  let current = 'visao';
+  const show = (id, link) => {
+    current = id;
+    tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === id)));
+    ['visao', 'riscos', 'qualidade'].forEach((s) => { document.getElementById(s).hidden = s !== id; });
+    document.getElementById('filtros').hidden = id !== 'visao';
+    if (link) dash.setLink(id);
+    draw();
+  };
+  tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.tab, true)));
+
+  const fail = (el, st) => { if (st === 'error' || st === 'connect') { el.replaceChildren(); const d = document.createElement('div'); d.className = 'vx-fail'; d.textContent = 'Failed to load'; el.append(d); return true; } return false; };
+  const tipFor = (box) => { let t = box.querySelector('.vx-tip'); if (!t) { t = document.createElement('div'); t.className = 'vx-tip'; t.hidden = true; box.append(t); } return t; };
+  const placeTip = (box, tip, x, y) => {
+    tip.hidden = false;
+    const w = tip.offsetWidth, W = box.clientWidth;
+    tip.style.left = Math.max(0, Math.min(W - w, x - w / 2)) + 'px';
+    tip.style.top = Math.max(0, y - tip.offsetHeight - 10) + 'px';
+  };
+  const tipLines = (tip, head, lines) => {
+    tip.replaceChildren();
+    const h = document.createElement('div'); h.className = 'k'; h.textContent = head; tip.append(h);
+    lines.forEach(([c, name, v]) => {
+      const l = document.createElement('div');
+      if (c) { const i = document.createElement('i'); i.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${c}`; l.append(i); }
+      l.append(document.createTextNode(name + ': ' + v)); tip.append(l);
+    });
+  };
+  const axisStyle = (g) => { g.attr('font-size', null).attr('font-family', null); g.selectAll('text').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)'); g.selectAll('.domain').attr('stroke', 'var(--cds-chart-axis)'); g.selectAll('line').attr('stroke', 'var(--cds-chart-grid)'); };
+
+  // ---------- KPIs ----------
+  const TILES = [
+    { f: 'net', label: 'Receita líquida', fmt: rs, d: 'd_net', dfmt: 'pct', good: 1 },
+    { f: 'profit', label: 'Lucro líquido', fmt: rs, d: 'd_profit', dfmt: 'pct', good: 1 },
+    { f: 'margin', label: 'Margem líquida', fmt: (v) => pct(v), d: 'd_margin', dfmt: 'pp', good: 1 },
+    { f: 'orders', label: 'Pedidos', fmt: int, d: 'd_orders', dfmt: 'pct', good: 1 },
+    { f: 'aov', label: 'Ticket médio (bruto)', fmt: (v) => 'Rs ' + int(v), d: 'd_aov', dfmt: 'pct', good: 1 },
+    { f: 'lost', label: 'Taxa de perda', fmt: (v) => pct(v), d: 'd_lost', dfmt: 'pp', good: -1, hint: 'cancelado, devolvido ou reembolsado' },
+  ];
+  const kpiBox = document.getElementById('kpis');
+  TILES.forEach((t) => {
+    const el = document.createElement('div'); el.className = 'vx-tile'; el.id = 'kpi-' + t.f;
+    el.innerHTML = `<div class="vx-tile-label"></div><div class="vx-tile-value dash-skeleton" data-source="kpi_slices" data-field="${t.f}"></div><div class="vx-tile-delta"><span class="vx-d" data-source="kpi_delta" data-field="${t.d}"></span> <span class="vx-dl"></span></div>`;
+    el.querySelector('.vx-tile-label').textContent = t.label + (t.hint ? ' (' + t.hint + ')' : '');
+    kpiBox.append(el);
+  });
+  const fmtDelta = (v, kind) => {
+    if (!isFinite(v)) return '';
+    const s = v > 0 ? '+' : v < 0 ? '−' : '±';
+    return kind === 'pp' ? s + Math.abs(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' p.p.' : s + Math.abs(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+  };
+
+  let kIndex = null, kIndexFor = null, dIndex = null, dIndexFor = null;
+  const drawKpis = (k, dl) => {
+    const p = P(); const key = keyOf(p); const where = 'key=' + enc(key);
+    if (k.status === 'ok' && kIndexFor !== k.data) { kIndexFor = k.data; kIndex = new Map(k.data.map((r) => [r.key, r])); }
+    if (dl.status === 'ok' && dIndexFor !== dl.data) { dIndexFor = dl.data; dIndex = new Map(dl.data.map((r) => [r.key, r])); }
+    const row = k.status === 'ok' ? kIndex.get(key) : null;
+    const drow = dl.status === 'ok' ? dIndex.get(key) : null;
+    TILES.forEach((t) => {
+      const el = document.getElementById('kpi-' + t.f);
+      const v = el.querySelector('.vx-tile-value'); const d = el.querySelector('.vx-d'); const dlab = el.querySelector('.vx-dl');
+      if (fail(v, k.status)) return;
+      v.classList.toggle('dash-skeleton', k.status === 'loading');
+      v.dataset.where = where;
+      v.textContent = row ? t.fmt(num(row[t.f])) : '—';
+      d.dataset.where = where;
+      if (drow) {
+        const x = drow[t.d];
+        d.textContent = fmtDelta(x, t.dfmt);
+        d.className = 'vx-d ' + (Math.abs(x) < 0.0005 ? 'vx-flat' : x * t.good > 0 ? 'vx-up' : 'vx-down');
+        dlab.textContent = 'vs 2024';
+      } else { d.textContent = ''; d.className = 'vx-d'; dlab.textContent = p.year === '2025' ? '' : 'selecione 2025 para comparar'; }
+    });
+    // frase-resumo
+    const tk = document.getElementById('takeaway');
+    tk.replaceChildren();
+    if (!row) { tk.textContent = k.status === 'ok' ? 'Sem pedidos para esta combinação de filtros.' : ''; return; }
+    const span = (src, f, txt, tag = 'b') => { const s = document.createElement(tag); s.dataset.source = src; s.dataset.field = f; s.dataset.where = where; s.textContent = txt; return s; };
+    const per = p.year === ALL ? 'Em jan/2024 a dez/2025' : 'Em ' + p.year;
+    tk.append(per + ', a receita líquida foi de ', span('kpi_slices', 'net', rs(num(row.net))));
+    if (drow) tk.append(' (', span('kpi_delta', 'd_net', fmtDelta(drow.d_net, 'pct'), 'span'), ' contra 2024)');
+    tk.append(', com margem de ', span('kpi_slices', 'margin', pct(num(row.margin))), ' e ', span('kpi_slices', 'lost', pct(num(row.lost))),
+      ' dos pedidos perdidos em cancelamento ou devolução.');
+    if (drow) tk.append(Math.abs(drow.d_net) < 0.02 ? ' Recorte estável, sem crescimento real: a prioridade é recuperar o pico de fim de ano e conter desconto e devolução.'
+      : drow.d_net < 0 ? ' Recorte em queda: veja o registro de riscos para os gatilhos e ações.' : ' Recorte em crescimento: proteja margem e estoque para sustentar o ritmo.');
+  };
+
+  // ---------- série mensal ----------
+  let mIdx = null, mIdxFor = null;
+  const drawMonthly = (m) => {
+    const box = document.getElementById('ch-mensal');
+    if (fail(box, m.status)) return;
+    if (m.status !== 'ok') { box.classList.add('dash-skeleton'); return; }
+    box.classList.remove('dash-skeleton');
+    if (mIdxFor !== m.data) { mIdxFor = m.data; mIdx = d3.group(m.data, (r) => [r.region, r.category, r.channel, r.segment].join('|')); }
+    const p = P();
+    let rows = (mIdx.get([p.region, p.category, p.channel, p.segment].join('|')) || []).slice().sort((a, b) => a.month.localeCompare(b.month));
+    if (p.year !== ALL) rows = rows.filter((r) => r.month.startsWith(p.year));
+    box.querySelector('svg')?.remove();
+    if (!rows.length) return;
+    const data = rows.map((r) => ({ m: r.month, v: num(r.net), lost: num(r.lost), o: num(r.orders) }));
+    const mean = d3.mean(data, (d) => d.v), sd = d3.deviation(data, (d) => d.v) || 0;
+    const lcl = mean - 2 * sd, ucl = mean + 2 * sd;
+    const W = box.clientWidth, H = 260;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const y = d3.scaleLinear([Math.min(lcl, d3.min(data, (d) => d.v)) * 0.95, Math.max(ucl, d3.max(data, (d) => d.v)) * 1.03], [H - 28, 10]).nice();
+    const gy = svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(rs).tickSize(0));
+    const ml = Math.ceil(d3.max(gy.selectAll('text').nodes(), (n) => n.getComputedTextLength()) || 40) + 10;
+    gy.remove();
+    const x = d3.scalePoint(data.map((d) => d.m), [ml + 6, W - 14]);
+    svg.append('g').attr('transform', `translate(${ml},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(rs).tickSize(-(W - ml - 8))).call(axisStyle).call((g) => g.select('.domain').remove());
+    const every = Math.ceil(data.length / Math.max(2, Math.floor((W - ml) / 52)));
+    svg.append('g').attr('transform', `translate(0,${H - 28})`).call(d3.axisBottom(x).tickValues(data.map((d) => d.m).filter((_, i) => i % every === 0)).tickFormat(mLabel).tickSize(0).tickPadding(8)).call(axisStyle).call((g) => g.select('.domain').remove());
+    svg.append('rect').attr('x', ml).attr('width', W - ml - 8).attr('y', y(ucl)).attr('height', Math.max(0, y(lcl) - y(ucl))).attr('fill', dash.colors[0]).attr('opacity', 0.08);
+    [[ucl, 'LSC'], [mean, 'Média'], [lcl, 'LIC']].forEach(([v, n]) => {
+      svg.append('line').attr('x1', ml).attr('x2', W - 8).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', n === 'Média' ? '4 4' : '2 3').attr('stroke-width', 1);
+    });
+    const gid = 'gm' + Math.random().toString(36).slice(2, 7);
+    const lg = svg.append('defs').append('linearGradient').attr('id', gid).attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', 1);
+    [[0, .26], [.25, .16], [.5, .08], [.75, .03], [1, 0]].forEach(([o, a]) => lg.append('stop').attr('offset', o).attr('style', `stop-color:${dash.colors[0]};stop-opacity:${a}`));
+    svg.append('path').datum(data).attr('fill', `url(#${gid})`).attr('d', d3.area().x((d) => x(d.m)).y0(H - 28).y1((d) => y(d.v)));
+    svg.append('path').datum(data).attr('fill', 'none').attr('stroke', dash.colors[0]).attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round').attr('d', d3.line().x((d) => x(d.m)).y((d) => y(d.v)));
+    const out = (d) => d.v > ucl || d.v < lcl;
+    svg.append('g').selectAll('circle').data(data).join('circle').attr('cx', (d) => x(d.m)).attr('cy', (d) => y(d.v)).attr('r', (d) => (out(d) ? 5 : 3))
+      .attr('fill', (d) => (out(d) ? 'var(--cds-chart-status-critical)' : dash.colors[0])).attr('stroke', 'var(--color-panel)').attr('stroke-width', 1.5);
+    const tip = tipFor(box); const hl = svg.append('line').attr('stroke', 'var(--cds-chart-axis)').attr('y1', 10).attr('y2', H - 28).attr('opacity', 0);
+    svg.append('rect').attr('x', ml).attr('width', W - ml).attr('height', H).attr('fill', 'transparent')
+      .on('mousemove', (ev) => {
+        const [mx] = d3.pointer(ev); const d = data[d3.minIndex(data, (r) => Math.abs(x(r.m) - mx))];
+        hl.attr('x1', x(d.m)).attr('x2', x(d.m)).attr('opacity', 1);
+        tipLines(tip, mLabel(d.m) + (out(d) ? (d.v > ucl ? ' · acima do LSC' : ' · abaixo do LIC') : ''), [[dash.colors[0], 'Receita líquida', rs(d.v)], [null, 'Pedidos', int(d.o)], [null, 'Taxa de perda', pct(d.lost)]]);
+        placeTip(box, tip, x(d.m), y(d.v));
+      }).on('mouseleave', () => { tip.hidden = true; hl.attr('opacity', 0); });
+    const lab = (txt, v) => svg.append('text').attr('x', W - 10).attr('y', y(v) - 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text(txt);
+    if (y(lcl) - y(ucl) > 30) { lab('LSC ' + rs(ucl), ucl); lab('LIC ' + rs(lcl), lcl); }
+  };
+
+  // ---------- barras por dimensão ----------
+  const drawBreak = (k, dim) => {
+    const box = document.getElementById('br-' + dim);
+    if (fail(box, k.status)) return;
+    if (k.status !== 'ok') { box.classList.add('dash-skeleton'); return; }
+    box.classList.remove('dash-skeleton');
+    const p = P();
+    const rows = k.data.filter((r) => r[dim] !== ALL && DIMS.every((d) => d === dim || r[d] === p[d])).sort((a, b) => num(b.net) - num(a.net));
+    const max = d3.max(rows, (r) => num(r.net)) || 1;
+    box.replaceChildren(...rows.map((r) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'vx-bar' + (p[dim] === ALL || p[dim] === r[dim] ? ' on' : '');
+      b.setAttribute('aria-pressed', String(p[dim] === r[dim]));
+      const n = document.createElement('span'); n.className = 'vx-bar-name'; n.textContent = tr(r[dim]); n.title = tr(r[dim]);
+      const t = document.createElement('span'); t.className = 'vx-bar-track'; const f = document.createElement('span'); f.className = 'vx-bar-fill'; f.style.display = 'block'; f.style.width = (num(r.net) / max * 100) + '%'; t.append(f);
+      const v = document.createElement('span'); v.className = 'vx-bar-val';
+      const vn = document.createElement('span'); vn.dataset.source = 'kpi_slices'; vn.dataset.field = 'net'; vn.dataset.where = 'key=' + enc(r.key); vn.textContent = rs(num(r.net));
+      const vm = document.createElement('small'); vm.dataset.source = 'kpi_slices'; vm.dataset.field = 'margin'; vm.dataset.where = 'key=' + enc(r.key); vm.textContent = pct(num(r.margin));
+      v.append(vn, ' · ', vm);
+      b.append(n, t, v);
+      b.addEventListener('click', () => dash.setParams({ [dim]: p[dim] === r[dim] ? ALL : r[dim] }));
+      return b;
+    }));
+  };
+
+  // ---------- tabela de produtos ----------
+  let sortKey = 'net', sortDir = -1;
+  document.querySelectorAll('#tb-prod th button').forEach((b) => b.addEventListener('click', () => {
+    const s = b.dataset.s; sortDir = sortKey === s ? -sortDir : (s === 'product' || s === 'category' ? 1 : -1); sortKey = s; draw();
+  }));
+  document.getElementById('prod-q').addEventListener('input', () => draw());
+  const drawProducts = (pr) => {
+    const tb = document.querySelector('#tb-prod tbody');
+    if (pr.status !== 'ok') { tb.replaceChildren(); return; }
+    const p = P(); const q = document.getElementById('prod-q').value.trim().toLowerCase();
+    let rows = pr.data.filter((r) => r.year === p.year && r.region === p.region && r.channel === p.channel && r.segment === p.segment && (p.category === ALL || r.category === p.category));
+    if (q) rows = rows.filter((r) => r.product.toLowerCase().includes(q) || tr(r.category).toLowerCase().includes(q));
+    const isNum = !(sortKey === 'product' || sortKey === 'category');
+    rows.sort((a, b) => sortDir * (isNum ? (num(a[sortKey]) || -1e15) - (num(b[sortKey]) || -1e15) : a[sortKey].localeCompare(b[sortKey])));
+    document.querySelectorAll('#tb-prod th').forEach((th) => th.setAttribute('aria-sort', th.dataset.field === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'));
+    const max = d3.max(rows, (r) => num(r.net)) || 1;
+    tb.replaceChildren(...rows.map((r) => {
+      const t = document.createElement('tr'); t.dataset.key = r.key;
+      const td = (txt, cls) => { const c = document.createElement('td'); if (cls) c.className = cls; c.textContent = txt; return c; };
+      const net = document.createElement('td'); net.className = 'n';
+      const ib = document.createElement('div'); ib.className = 'vx-inbar'; const bar = document.createElement('span'); bar.style.width = (num(r.net) / max * 100) + '%';
+      const nv = document.createElement('div'); nv.textContent = rs(num(r.net)); ib.append(bar, nv); net.append(ib);
+      const y = num(r.yoy); const yc = td(isFinite(y) ? fmtDelta(y, 'pct') : '—', 'n'); if (isFinite(y)) yc.classList.add(y >= 0 ? 'vx-up' : 'vx-down');
+      const rc = td(pct(num(r.ret)), 'n'); if (num(r.ret) > 0.065) rc.classList.add('vx-down');
+      t.append(td(r.product), td(tr(r.category)), net, td(pct(num(r.margin)), 'n'), td(int(num(r.orders)), 'n'), rc, yc);
+      return t;
+    }));
+    document.getElementById('prod-note').textContent = p.year === '2025' ? 'Ano 2025 contra 2024. Devolução acima de 6,5% em vermelho. Clique no cabeçalho para ordenar.' : 'Selecione o ano 2025 para ver a variação contra 2024. Clique no cabeçalho para ordenar.';
+  };
+
+  // ---------- riscos ----------
+  const SEV = { 'Crítico': 's1', 'Alto': 's2', 'Médio': 's3', 'Baixo': 's4' };
+  const drawAlerts = (a) => {
+    const tb = document.querySelector('#tb-alerts tbody');
+    if (a.status !== 'ok') { tb.replaceChildren(); return; }
+    const rows = a.data.slice().sort((x, y) => num(x.sev_rank) - num(y.sev_rank));
+    tb.replaceChildren(...rows.map((r) => {
+      const t = document.createElement('tr'); t.dataset.key = r.id;
+      const s = document.createElement('td'); const pill = document.createElement('span'); pill.className = 'vx-pill ' + (SEV[r.severity] || 's4'); pill.textContent = r.severity; s.append(pill);
+      const sig = document.createElement('td'); sig.textContent = r.signal; sig.style.fontWeight = '600'; sig.style.minWidth = '9rem';
+      const c = (txt) => { const d = document.createElement('td'); d.className = 'txt'; d.textContent = txt; return d; };
+      t.append(s, sig, c(r.evidence), c(r.trigger), c(r.action));
+      return t;
+    }));
+  };
+
+  const drawForecast = (f) => {
+    const box = document.getElementById('ch-prev');
+    if (fail(box, f.status)) return;
+    if (f.status !== 'ok') { box.classList.add('dash-skeleton'); return; }
+    box.classList.remove('dash-skeleton'); box.querySelector('svg')?.remove();
+    const d = f.data.map((r) => ({ m: r.month, a: num(r.actual), t: num(r.trend), f: num(r.forecast), lo: num(r.fc_lo), hi: num(r.fc_hi), lcl: num(r.lcl), ucl: num(r.ucl), mean: num(r.mean) }));
+    const W = box.clientWidth, H = 260;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const vals = d.flatMap((r) => [r.a, r.lo, r.hi, r.lcl, r.ucl]).filter(isFinite);
+    const y = d3.scaleLinear([d3.min(vals) * 0.95, d3.max(vals) * 1.02], [H - 28, 10]).nice();
+    const gy = svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(rs)); const ml = Math.ceil(d3.max(gy.selectAll('text').nodes(), (n) => n.getComputedTextLength()) || 40) + 10; gy.remove();
+    const x = d3.scalePoint(d.map((r) => r.m), [ml + 6, W - 14]);
+    svg.append('g').attr('transform', `translate(${ml},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(rs).tickSize(-(W - ml - 8))).call(axisStyle).call((g) => g.select('.domain').remove());
+    const every = Math.ceil(d.length / Math.max(2, Math.floor((W - ml) / 52)));
+    svg.append('g').attr('transform', `translate(0,${H - 28})`).call(d3.axisBottom(x).tickValues(d.map((r) => r.m).filter((_, i) => i % every === 0 || i === d.length - 1)).tickFormat(mLabel).tickSize(0).tickPadding(8)).call(axisStyle).call((g) => g.select('.domain').remove());
+    const lcl = d[0].lcl, ucl = d[0].ucl;
+    [[ucl, '2 3'], [lcl, '2 3']].forEach(([v, dsh]) => svg.append('line').attr('x1', ml).attr('x2', W - 8).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', 'var(--cds-chart-status-critical)').attr('stroke-dasharray', dsh).attr('opacity', 0.7));
+    const act = d.filter((r) => isFinite(r.a)), fc = d.filter((r) => isFinite(r.f));
+    svg.append('path').datum(act).attr('fill', 'none').attr('stroke', 'var(--cds-chart-muted)').attr('stroke-width', 1.5).attr('stroke-dasharray', '4 4').attr('d', d3.line().x((r) => x(r.m)).y((r) => y(r.t)));
+    svg.append('path').datum(act).attr('fill', 'none').attr('stroke', dash.colors[0]).attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round').attr('d', d3.line().x((r) => x(r.m)).y((r) => y(r.a)));
+    const last = act[act.length - 1];
+    svg.append('path').datum([{ m: last.m, lo: last.a, hi: last.a }, ...fc]).attr('fill', dash.colors[1]).attr('opacity', 0.15).attr('d', d3.area().x((r) => x(r.m)).y0((r) => y(r.lo)).y1((r) => y(r.hi)));
+    svg.append('path').datum([{ m: last.m, f: last.a }, ...fc]).attr('fill', 'none').attr('stroke', dash.colors[1]).attr('stroke-width', 2).attr('stroke-dasharray', '5 3').attr('d', d3.line().x((r) => x(r.m)).y((r) => y(r.f)));
+    svg.append('g').selectAll('circle').data(fc).join('circle').attr('cx', (r) => x(r.m)).attr('cy', (r) => y(r.f)).attr('r', 4).attr('fill', dash.colors[1]);
+    const tip = tipFor(box);
+    svg.append('rect').attr('x', ml).attr('width', W - ml).attr('height', H).attr('fill', 'transparent')
+      .on('mousemove', (ev) => {
+        const [mx] = d3.pointer(ev); const r = d[d3.minIndex(d, (q) => Math.abs(x(q.m) - mx))];
+        const L = isFinite(r.a) ? [[dash.colors[0], 'Realizado', rs(r.a)], [null, 'Tendência', rs(r.t)]] : [[dash.colors[1], 'Previsão', rs(r.f)], [null, 'Intervalo 95%', rs(r.lo) + ' a ' + rs(r.hi)]];
+        L.push([null, 'LIC / LSC', rs(r.lcl) + ' / ' + rs(r.ucl)]);
+        tipLines(tip, mLabel(r.m), L); placeTip(box, tip, x(r.m), y(isFinite(r.a) ? r.a : r.f));
+      }).on('mouseleave', () => { tip.hidden = true; });
+    const lg = document.getElementById('lg-prev'); lg.replaceChildren();
+    [[dash.colors[0], 'Realizado'], [css('--cds-chart-muted') || 'gray', 'Tendência linear'], [dash.colors[1], 'Previsão e intervalo 95%'], [css('--cds-chart-status-critical') || 'red', 'Limites de controle (LIC/LSC)']].forEach(([c, n]) => {
+      const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = c; s.append(i, n); lg.append(s);
+    });
+  };
+
+  const barChart = (box, rows, xk, yk, { fmt, color, line, lineFmt, H = 200, hl }) => {
+    box.querySelector('svg')?.remove();
+    const W = box.clientWidth;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const x = d3.scaleBand(rows.map((r) => r[xk]), [8, W - 8]).padding(0.3);
+    const y = d3.scaleLinear([0, d3.max(rows, (r) => num(r[yk])) * 1.18], [H - 26, 8]);
+    svg.append('g').attr('transform', `translate(0,${H - 26})`).call(d3.axisBottom(x).tickSize(0).tickPadding(8)).call(axisStyle).call((g) => g.select('.domain').attr('stroke', 'var(--cds-chart-axis)'));
+    const bw = Math.min(32, x.bandwidth()); const off = (x.bandwidth() - bw) / 2;
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (r) => x(r[xk]) + off).attr('width', bw).attr('y', (r) => y(num(r[yk]))).attr('height', (r) => y(0) - y(num(r[yk]))).attr('rx', 4)
+      .attr('fill', (r) => (hl && hl(r) ? 'var(--cds-chart-status-critical)' : color));
+    if (x.bandwidth() > 26) svg.append('g').selectAll('text').data(rows).join('text').attr('x', (r) => x(r[xk]) + x.bandwidth() / 2).attr('y', (r) => y(num(r[yk])) - 4).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((r) => fmt(num(r[yk])));
+    if (line) {
+      const y2 = d3.scaleLinear([0, d3.max(rows, (r) => num(r[line])) * 1.25], [H - 26, 8]);
+      svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', dash.colors[1]).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('d', d3.line().x((r) => x(r[xk]) + x.bandwidth() / 2).y((r) => y2(num(r[line]))));
+      svg.append('g').selectAll('circle').data(rows).join('circle').attr('cx', (r) => x(r[xk]) + x.bandwidth() / 2).attr('cy', (r) => y2(num(r[line]))).attr('r', 3.5).attr('fill', dash.colors[1]);
+    }
+    const tip = tipFor(box);
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (r) => x(r[xk])).attr('width', x.bandwidth()).attr('y', 0).attr('height', H).attr('fill', 'transparent')
+      .on('mousemove', (ev, r) => { const L = [[color, yk === 'margin' ? 'Margem' : yk === 'ret' ? 'Devolução' : 'Índice', fmt(num(r[yk]))]]; if (line) L.push([dash.colors[1], 'Devolução', lineFmt(num(r[line]))]); if (r.orders) L.push([null, 'Pedidos', int(num(r.orders))]); tipLines(tip, r[xk], L); placeTip(box, tip, x(r[xk]) + x.bandwidth() / 2, y(num(r[yk]))); })
+      .on('mouseleave', () => { tip.hidden = true; });
+  };
+
+  const drawSmall = (id, ds, fn) => {
+    const box = document.getElementById(id);
+    if (fail(box, ds.status)) return;
+    if (ds.status !== 'ok') { box.classList.add('dash-skeleton'); return; }
+    box.classList.remove('dash-skeleton'); fn(box, ds.data);
+  };
+
+  const drawCustomers = (c) => {
+    const tb = document.querySelector('#tb-cust tbody');
+    if (c.status !== 'ok') { tb.replaceChildren(); return; }
+    const F = { pct: (v) => pct(v), int, dec };
+    tb.replaceChildren(...c.data.map((r) => {
+      const t = document.createElement('tr'); t.dataset.key = r.metric;
+      const a = document.createElement('td'); a.textContent = r.label; const b = document.createElement('td'); b.className = 'n'; b.textContent = (F[r.fmt] || dec)(num(r.value));
+      t.append(a, b); return t;
+    }));
+  };
+
+  const drawQuality = (q) => {
+    const tb = document.querySelector('#tb-qual tbody');
+    if (q.status !== 'ok') { tb.replaceChildren(); return; }
+    const max = d3.max(q.data.filter((r) => r.regra !== 'TOTAL'), (r) => num(r.pct)) || 1;
+    tb.replaceChildren(...q.data.map((r) => {
+      const t = document.createElement('tr'); t.dataset.key = r.n;
+      const td = (txt, cls) => { const c = document.createElement('td'); if (cls) c.className = cls; c.textContent = txt; return c; };
+      const pc = document.createElement('td'); pc.className = 'n';
+      if (r.regra === 'TOTAL') { pc.textContent = pct(num(r.pct)); } else {
+        const ib = document.createElement('div'); ib.className = 'vx-inbar'; const bar = document.createElement('span'); bar.style.width = (num(r.pct) / max * 100) + '%'; const v = document.createElement('div'); v.textContent = pct(num(r.pct), 2); ib.append(bar, v); pc.append(ib);
+      }
+      const reg = td(r.regra, 'txt'); if (r.regra === 'TOTAL') { reg.style.fontWeight = '600'; reg.textContent = 'Total da base bruta'; }
+      t.append(td(r.n, 'n'), reg, td(int(num(r.linhas)), 'n'), pc, td(r.tratamento, 'txt'));
+      return t;
+    }));
+  };
+
+  // ---------- desenho ----------
+  const draw = () => {
+    const k = dash.data('kpi_slices');
+    if (k.status === 'ok') fillFilters(k.data);
+    if (current === 'visao') {
+      drawKpis(k, dash.data('kpi_delta'));
+      drawMonthly(dash.data('monthly_slices'));
+      ['region', 'category', 'channel', 'segment'].forEach((d) => drawBreak(k, d));
+      drawProducts(dash.data('product_slices'));
+    } else if (current === 'riscos') {
+      drawAlerts(dash.data('alerts'));
+      drawForecast(dash.data('forecast'));
+      drawSmall('ch-saz', dash.data('seasonality'), (box, rows) => barChart(box, rows, 'month', 'index', { fmt: (v) => Math.round(v), color: dash.colors[0], hl: (r) => num(r.index) < 90 || num(r.index) > 110 }));
+      drawSmall('ch-desc', dash.data('discount_bands'), (box, rows) => barChart(box, rows, 'band', 'margin', { fmt: (v) => pct(v), color: dash.colors[0], line: 'ret', lineFmt: (v) => pct(v) }));
+      drawSmall('ch-nota', dash.data('rating_returns'), (box, rows) => barChart(box, rows, 'rating', 'ret', { fmt: (v) => pct(v), color: 'var(--cds-chart-muted)', hl: (r) => num(r.ret) > 0.3 }));
+      drawCustomers(dash.data('customers'));
+    } else {
+      drawQuality(dash.data('quality'));
+    }
+  };
+
+  dash.onData(draw);
+  const named = location.hash.slice(1);
+  show(['visao', 'riscos', 'qualidade'].includes(named) ? named : 'visao', false);
+})();
+</script>
+</main>
+<footer class="shell-foot">Painel elaborado por Diego Satochi · Dados de jan/2024 a dez/2025, tratados em Python e validados contra 37 medidas DAX no Power BI.</footer>
+</body>
+</html>

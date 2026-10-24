@@ -1,0 +1,11 @@
+metric,label,value,fmt
+retention,Retenção 2024 → 2025,0.8217,pct
+customers,Clientes ativos (24 meses),25205.0,int
+orders_per_customer,Pedidos por cliente,3.57,dec
+gap_median,Intervalo mediano entre compras (dias),102.0,int
+dormant,Clientes sem compra há mais de 314 dias (P90 do intervalo),4997.0,int
+top10,Receita dos 10% maiores clientes,0.2836,pct
+pct80,Clientes que somam 80% da receita,0.5126,pct
+hhi_region,HHI por região (>2.500 = concentrado),3508.0,int
+hhi_channel,HHI por canal,3223.0,int
+hhi_product,HHI por produto,639.0,int
