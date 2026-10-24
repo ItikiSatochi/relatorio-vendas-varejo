@@ -47,6 +47,8 @@ body{margin:0;background:var(--bg);color:var(--color-fg);font:15px/1.5 var(--fon
 #dash-root{max-width:1200px;margin:0 auto;padding:8px 16px 48px}
 .vx-title{font-weight:800 !important;letter-spacing:-.01em}
 .dash-skeleton{min-height:12rem}
+.vx-chart.dash-skeleton{display:flex;align-items:center;justify-content:center}
+.vx-chart.dash-skeleton::after{content:'Carregando dados…';font-size:13px;color:var(--color-fg-muted)}
 .vx-tile-value{font-size:24px !important;white-space:nowrap}
 .shell-foot{max-width:1200px;margin:0 auto;padding:16px 16px 40px;font-size:13px;color:var(--color-fg-muted)}
 </style>
@@ -83,10 +85,23 @@ body{margin:0;background:var(--bg);color:var(--color-fg);font:15px/1.5 var(--fon
     setLink:function(id){history.replaceState(null,'',location.pathname+location.search+'#'+id);}
   };
   window.addEventListener('DOMContentLoaded',function(){
-    SOURCES.forEach(function(n){
-      d3.csv('data/'+n+'.csv').then(function(rows){store[n]={status:'ok',data:rows};runCalcs();emit();})
-        .catch(function(){store[n]={status:'error',data:[]};runCalcs();emit();});
-    });
+    // Carrega primeiro os arquivos pequenos (abas de riscos e qualidade) e depois as fatias grandes, uma de cada vez.
+    function load(n){
+      return d3.csv('data/'+n+'.csv').then(function(rows){store[n]={status:'ok',data:rows};})
+        .catch(function(){store[n]={status:'error',data:[]};})
+        .then(function(){runCalcs();emit();});
+    }
+    var small=['alerts','forecast','seasonality','discount_bands','rating_returns','customers','quality'];
+    Promise.all(small.map(load)).then(function(){return load('kpi_slices');}).then(function(){return load('monthly_slices');}).then(function(){return load('product_slices');});
+    // Redesenha quando um gráfico muda de largura, inclusive quando foi desenhado com a aba ainda oculta.
+    if(window.ResizeObserver){
+      var widths=new WeakMap(),rq;
+      var ro=new ResizeObserver(function(entries){
+        var changed=entries.some(function(e){var w=Math.round(e.contentRect.width),o=widths.get(e.target);widths.set(e.target,w);return w>0&&o!==w;});
+        if(changed){clearTimeout(rq);rq=setTimeout(emit,60);}
+      });
+      document.querySelectorAll('.vx-chart').forEach(function(el){ro.observe(el);});
+    }
     var root=document.documentElement,btn=document.getElementById('themeBtn');
     try{var t=localStorage.getItem('theme');if(t)root.setAttribute('data-theme',t);}catch(e){}
     btn.onclick=function(){
@@ -94,7 +109,6 @@ body{margin:0;background:var(--bg);color:var(--color-fg);font:15px/1.5 var(--fon
       var n=dark?'light':'dark';root.setAttribute('data-theme',n);try{localStorage.setItem('theme',n);}catch(e){}
       document.querySelector('.vx').style.setProperty('--vx-accent',dash.colors[0]);emit();
     };
-    var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(emit,150);});
   });
 })();
 </script>
