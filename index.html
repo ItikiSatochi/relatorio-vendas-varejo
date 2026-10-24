@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatório de Vendas no Varejo · Diego Satochi</title>
+<meta name="description" content="Análise analítica e preventiva de 24 meses de vendas no varejo: desempenho, mix, riscos com gatilho de alerta, previsão e plano de 90 dias.">
+<meta property="og:title" content="Relatório de Vendas no Varejo · Análise preventiva">
+<meta property="og:description" content="89.904 pedidos, 24 meses, 11 riscos com gatilho de alerta e plano de ação de 90 dias.">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F5F7FA; --surface:#FFFFFF; --ink:#1B2230; --muted:#4E596B; --line:#DCE2EA;
+  --accent:#2F6FDB; --accent-soft:rgba(47,111,219,.10); --gray:#8A97AB;
+  --bad:#B3261E; --warn:#A86200; --good:#1E7A4C; --band:rgba(47,111,219,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1726; --surface:#121E31; --ink:#F2F5F9; --muted:#A9B4C4; --line:#26344A;
+    --accent:#3FA9F5; --accent-soft:rgba(63,169,245,.12); --gray:#6B778A;
+    --bad:#FF8A6B; --warn:#F2B84B; --good:#5BD08F; --band:rgba(63,169,245,.10);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1726; --surface:#121E31; --ink:#F2F5F9; --muted:#A9B4C4; --line:#26344A;
+  --accent:#3FA9F5; --accent-soft:rgba(63,169,245,.12); --gray:#6B778A;
+  --bad:#FF8A6B; --warn:#F2B84B; --good:#5BD08F; --band:rgba(63,169,245,.10);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 'IBM Plex Sans',system-ui,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:10px;padding-bottom:10px}
+.brand{font-family:'Archivo',sans-serif;font-weight:600;font-size:15px}
+.tools{display:flex;gap:8px;align-items:center}
+button.tg{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+button.tg[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+nav.toc{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
+nav.toc a{flex:none;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+nav.toc a:hover{color:var(--accent);border-color:var(--accent)}
+.hero{padding-top:56px;padding-bottom:24px}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.12em;color:var(--accent);text-transform:uppercase}
+h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(32px,6vw,54px);line-height:1.05;letter-spacing:-.02em;margin:10px 0 16px}
+h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(24px,4vw,32px);line-height:1.15;letter-spacing:-.01em;margin:0 0 8px}
+h3{font-size:18px;margin:24px 0 8px}
+.lead{font-size:18px;color:var(--muted);max-width:720px;margin:0}
+.meta{margin-top:16px;font-size:14px;color:var(--muted)}
+section{padding:40px 0;border-top:1px solid var(--line);scroll-margin-top:110px}
+section > .wrap > p.sub{color:var(--muted);margin:0 0 20px;max-width:720px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:24px 0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.kpi .l{font-size:13px;color:var(--muted)}
+.kpi .v{font-family:'Archivo',sans-serif;font-weight:600;font-size:28px;line-height:1.2;margin:4px 0;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:13px}
+.bad{color:var(--bad)} .good{color:var(--good)} .warn{color:var(--warn)} .flat{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin:16px 0}
+.card h3{margin-top:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+ul.find{margin:0;padding-left:20px} ul.find li{margin:6px 0}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--bg)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.chart{width:100%;height:auto;display:block}
+.chart text{font-family:'IBM Plex Sans',sans-serif;fill:var(--muted)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.bars .row{display:grid;grid-template-columns:46px 1fr 60px;gap:10px;align-items:center;margin:6px 0;font-size:14px}
+.bars .track{height:14px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bars .fill{height:14px;border-radius:4px}
+.note{font-size:13px;color:var(--muted)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 10px 10px 0;margin:16px 0}
+footer{padding:32px 0 48px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.money{transition:filter .2s}
+body.anon .money{filter:blur(6px);user-select:none}
+@media (max-width:600px){ .hero{padding-top:32px} .brand{font-size:13px} .kpi .v{font-size:24px} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <span class="brand">Relatório de Vendas no Varejo</span>
+    <div class="tools">
+      <button class="tg" id="anonBtn" aria-pressed="false" title="Oculta os valores absolutos em rúpias">Ocultar valores</button>
+      <button class="tg" id="themeBtn" aria-label="Alternar tema">Tema</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <nav class="toc" aria-label="Seções">
+      <a href="#sumario">Sumário</a><a href="#qualidade">Qualidade</a><a href="#desempenho">Desempenho</a>
+      <a href="#mix">Mix</a><a href="#preventiva">Análise preventiva</a><a href="#previsao">Previsão</a>
+      <a href="#plano">Plano 90 dias</a><a href="#metodo">Metodologia</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <span class="eyebrow">Advanced Data Analytics · Análise preventiva</span>
+  <h1>24 meses de vendas: o que cresceu, o que encolheu e onde agir primeiro</h1>
+  <p class="lead">Base de 89.904 pedidos (jan/2024 a dez/2025), tratada com 29 regras auditáveis, analisada com controle estatístico e convertida em 11 riscos, cada um com um gatilho de alerta.</p>
+  <p class="meta">Diego Satochi · Valores em rúpias (Rs) · Receita líquida exclui pedidos cancelados, devolvidos, estornados e com devolução solicitada.</p>
+</div>
+
+<section id="sumario"><div class="wrap">
+  <h2>Sumário executivo</h2>
+  <p class="sub">A operação está estável no total, mas o trimestre mais forte do ano perdeu tração e há margem escapando por desconto e devolução.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Receita líquida 2025</div><div class="v money">Rs 401,1 mi</div><div class="d bad">−0,5% vs 2024</div></div>
+    <div class="kpi"><div class="l">Lucro líquido 2025</div><div class="v money">Rs 89,5 mi</div><div class="d bad">−0,3% vs 2024</div></div>
+    <div class="kpi"><div class="l">Margem líquida</div><div class="v">22,3%</div><div class="d flat">+0,04 p.p.</div></div>
+    <div class="kpi"><div class="l">Pedidos 2025</div><div class="v money">44.840</div><div class="d bad">−0,5% vs 2024</div></div>
+    <div class="kpi"><div class="l">Taxa de perda</div><div class="v">9,1%</div><div class="d good">−0,1 p.p.</div></div>
+    <div class="kpi"><div class="l">4º trimestre 2025</div><div class="v">−3,5%</div><div class="d bad">nov −4,4% · dez −6,6%</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>O que preocupa</h3><ul class="find">
+      <li>O pico de fim de ano encolheu: novembro e dezembro de 2025 ficaram abaixo de 2024.</li>
+      <li>9,2% dos pedidos viram perda (<span class="money">Rs 80,0 mi</span> brutos em 24 meses).</li>
+      <li>Descontos de 30% a 60% derrubam a margem para 14,8% e elevam a devolução para 8,5%.</li>
+      <li>Concentração alta: Punjab responde por 51% da receita (HHI 3.508).</li>
+    </ul></div>
+    <div class="card"><h3>O que sustenta</h3><ul class="find">
+      <li>Margem estável em 22,3% nos dois anos.</li>
+      <li>Retenção de clientes de 82,2%.</li>
+      <li>De janeiro a outubro, 2025 empatou ou cresceu contra 2024 na maior parte dos meses.</li>
+      <li>Beleza, Acessórios e Papelaria operam com margem acima de 28%.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="qualidade"><div class="wrap">
+  <h2>Base e qualidade dos dados</h2>
+  <p class="sub">Antes de qualquer número, o tratamento. Cada regra fica registrada numa trilha de auditoria.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Regras de limpeza</div><div class="v">29</div><div class="d flat">todas registradas</div></div>
+    <div class="kpi"><div class="l">Base preservada</div><div class="v">99,9%</div><div class="d flat">80 linhas removidas</div></div>
+    <div class="kpi"><div class="l">Grafias padronizadas</div><div class="v">40,8 mil</div><div class="d flat">em 6 colunas</div></div>
+    <div class="kpi"><div class="l">Erro mediano da reconciliação</div><div class="v">Rs 0,17</div><div class="d flat">preço × qtd × desconto + frete</div></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Problema encontrado</th><th class="n">Ocorrências</th><th>Tratamento</th></tr></thead>
+    <tbody>
+      <tr><td>Grafias divergentes (categoria, região, canal, status…)</td><td class="n">40.822</td><td>Padronização por dicionário de equivalência</td></tr>
+      <tr><td>Pedidos duplicados</td><td class="n">65</td><td>Removidos, mantendo o primeiro registro</td></tr>
+      <tr><td>Datas inválidas</td><td class="n">15</td><td>Removidas (sem data recuperável)</td></tr>
+      <tr><td>Preço e quantidade inconsistentes</td><td class="n">—</td><td>Reconciliados a partir do valor da venda, a fonte mais confiável</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="desempenho"><div class="wrap">
+  <h2>Desempenho 2024 contra 2025</h2>
+  <p class="sub">O pico de fim de ano encolheu em 2025. Fevereiro é o vale (−14% sobre a média) e novembro e dezembro, o pico (+13% a +14%).</p>
+  <div class="card">
+    <h3>Receita líquida mensal (Rs milhões)</h3>
+    <svg class="chart" id="yoy" viewBox="0 0 900 340" role="img" aria-label="Receita líquida mensal de 2024 e 2025; novembro e dezembro de 2025 abaixo de 2024"></svg>
+    <div class="legend"><span><i style="background:var(--gray)"></i>2024</span><span><i style="background:var(--accent)"></i>2025</span></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Indicador</th><th class="n">2024</th><th class="n">2025</th><th class="n">Variação</th></tr></thead>
+    <tbody>
+      <tr><td>Receita líquida</td><td class="n money">Rs 403,0 mi</td><td class="n money">Rs 401,1 mi</td><td class="n bad">−0,5%</td></tr>
+      <tr><td>Lucro líquido</td><td class="n money">Rs 89,7 mi</td><td class="n money">Rs 89,5 mi</td><td class="n bad">−0,3%</td></tr>
+      <tr><td>Margem líquida</td><td class="n">22,27%</td><td class="n">22,31%</td><td class="n flat">+0,04 p.p.</td></tr>
+      <tr><td>Pedidos</td><td class="n money">45.064</td><td class="n money">44.840</td><td class="n bad">−0,5%</td></tr>
+      <tr><td>Taxa de perda</td><td class="n">9,23%</td><td class="n">9,13%</td><td class="n good">−0,1 p.p.</td></tr>
+      <tr><td>Clientes ativos</td><td class="n money">21.313</td><td class="n money">21.405</td><td class="n good">+0,4%</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="mix"><div class="wrap">
+  <h2>Mix de categorias</h2>
+  <p class="sub">Eletrônicos traz um quarto da receita com a menor margem e a maior devolução. As categorias menores são as mais rentáveis.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Categoria</th><th class="n">Receita líquida</th><th class="n">Participação</th><th class="n">Margem</th><th class="n">Devolução</th></tr></thead>
+    <tbody id="catBody"></tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Concentração</h3><ul class="find">
+      <li>Punjab: 51% da receita (HHI 3.508, concentração alta).</li>
+      <li>Canal Online: 46% (HHI 3.223).</li>
+      <li>Os 10% melhores clientes geram 28,4% da receita.</li>
+    </ul></div>
+    <div class="card"><h3>Clientes</h3><ul class="find">
+      <li>Retenção de 82,2% entre os anos.</li>
+      <li>4.997 clientes dormentes (mais de 314 dias sem comprar).</li>
+      <li>25.205 clientes únicos no período.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="preventiva"><div class="wrap">
+  <h2>Análise preventiva</h2>
+  <p class="sub">Um KPI sem gatilho é só história. Cada risco abaixo tem um limite que dispara alerta antes do prejuízo aparecer no fechamento.</p>
+  <div class="card">
+    <h3>Faixa de controle da receita mensal (média ± 2σ)</h3>
+    <svg class="chart" id="ctrl" viewBox="0 0 900 300" role="img" aria-label="Receita mensal de jan/2024 a dez/2025 com faixa de controle; só dezembro de 2024 passa do limite superior"></svg>
+    <p class="note">Média Rs 33,5 mi · limite inferior Rs 28,3 mi · limite superior Rs 38,7 mi. Só dezembro de 2024 passou do limite superior.</p>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Severidade</th><th>Risco</th><th>Evidência</th><th>Gatilho e ação</th></tr></thead>
+    <tbody id="riskBody"></tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>A nota do cliente avisa antes do estorno</h3>
+      <p class="note" style="margin-top:0">Pedidos que viram devolução, por nota dada</p>
+      <div class="bars" id="ratingBars"></div>
+    </div>
+    <div class="card"><h3>Desconto contra margem</h3>
+      <div class="bars" id="discBars"></div>
+      <p class="note">Margem líquida por faixa de desconto. A devolução sobe de 4,9% para 8,5% no mesmo caminho.</p>
+    </div>
+  </div>
+  <div class="callout"><strong>Pedidos atípicos:</strong> 2.807 pedidos acima de <span class="money">Rs 36,1 mil</span> somam 17,5% da receita (principalmente cadeira de escritório e air fryer). Não são erro, mas merecem validação de estoque e crédito.</div>
+</div></section>
+
+<section id="previsao"><div class="wrap">
+  <h2>Previsão para o 1º trimestre de 2026</h2>
+  <p class="sub">Tendência linear ajustada pelo índice sazonal de cada mês, com intervalo de 95%.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Mês</th><th class="n">Previsão</th><th class="n">Intervalo de 95%</th><th>Leitura</th></tr></thead>
+    <tbody>
+      <tr><td>Janeiro/2026</td><td class="n money">Rs 33,0 mi</td><td class="n money">28,1 a 37,9</td><td>Dentro da faixa de controle</td></tr>
+      <tr><td>Fevereiro/2026</td><td class="n money">Rs 30,4 mi</td><td class="n money">25,5 a 35,4</td><td>Vale sazonal esperado; alerta só abaixo de Rs 28,3 mi</td></tr>
+      <tr><td>Março/2026</td><td class="n money">Rs 34,2 mi</td><td class="n money">29,3 a 39,1</td><td>Retomada</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="plano"><div class="wrap">
+  <h2>Plano de ação de 90 dias</h2>
+  <p class="sub">Ordenado por impacto estimado e facilidade de execução. Os valores são estimativas anuais a partir da base histórica.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Ação</th><th>Como</th><th class="n">Impacto estimado</th><th>Prazo</th></tr></thead>
+    <tbody>
+      <tr><td>Contato em nota baixa</td><td>Fluxo n8n dispara atendimento quando a avaliação é 1 ou 2</td><td class="n money">≈ Rs 1,5 mi/ano</td><td>30 dias</td></tr>
+      <tr><td>Alçada de desconto</td><td>Aprovação obrigatória acima de 20% de desconto</td><td class="n money">≈ Rs 2,0 mi/ano</td><td>30 dias</td></tr>
+      <tr><td>Devolução em Vestuário e Eletrônicos</td><td>Guia de tamanhos, fotos e checagem pré-envio</td><td class="n money">≈ Rs 2,8 mi/ano</td><td>60 dias</td></tr>
+      <tr><td>Reativação de dormentes</td><td>Campanha para os 4.997 clientes sem compra há 314+ dias</td><td class="n money">≈ Rs 2,5 mi</td><td>60 dias</td></tr>
+      <tr><td>Plano do 4º trimestre/2026</td><td>Estoque e campanha antecipados para novembro e dezembro</td><td class="n money">+ Rs 3,8 mi</td><td>90 dias</td></tr>
+      <tr><td>Expansão regional</td><td>Testar KP e Islamabad para reduzir a dependência de Punjab</td><td class="n">Reduz o risco de concentração</td><td>90 dias</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="metodo"><div class="wrap">
+  <h2>Metodologia e entregáveis</h2>
+  <div class="grid2">
+    <div class="card"><h3>Como foi feito</h3><ul class="find">
+      <li>Diagnóstico e ETL em Python (pandas), com trilha de auditoria por regra.</li>
+      <li>Power Query M em 3 camadas e 37 medidas DAX, validadas contra o Python.</li>
+      <li>Controle estatístico (média ± 2σ), índice sazonal, HHI e Pareto.</li>
+      <li>Previsão por tendência linear × sazonalidade, intervalo de 95%.</li>
+    </ul></div>
+    <div class="card"><h3>Próximo passo do ecossistema</h3><ul class="find">
+      <li>Google Sheets como captura diária.</li>
+      <li>n8n para checar os gatilhos e disparar alertas.</li>
+      <li>Power BI como camada de análise executiva.</li>
+    </ul></div>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">Relatório elaborado por Diego Satochi · Advanced Data Analytics, automação e IA aplicada a negócios.</div></footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  try{var t=localStorage.getItem('theme'); if(t) root.setAttribute('data-theme',t);}catch(e){}
+  document.getElementById('themeBtn').onclick=function(){
+    var dark=root.getAttribute('data-theme')?root.getAttribute('data-theme')==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+    var n=dark?'light':'dark'; root.setAttribute('data-theme',n);
+    try{localStorage.setItem('theme',n);}catch(e){}
+  };
+  var ab=document.getElementById('anonBtn');
+  ab.onclick=function(){var on=document.body.classList.toggle('anon'); ab.setAttribute('aria-pressed',on); ab.textContent=on?'Mostrar valores':'Ocultar valores';};
+
+  var fmt=function(v,d){return v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});};
+  var NS='http://www.w3.org/2000/svg';
+  function el(svg,tag,a,txt){var e=document.createElementNS(NS,tag);for(var k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;}
+
+  var a=[31.27,28.79,32.17,31.65,33.58,34.5,34.34,33.7,32.14,32.62,38.71,39.49];
+  var b=[31.81,29.12,32.67,32.17,34.04,33.72,35.88,33.14,31.56,33.08,37.0,36.9];
+  var mn=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+  // YoY chart
+  (function(){
+    var s=document.getElementById('yoy'),lo=27,hi=41,L=50,R=840,T=20,B=300;
+    var x=function(i){return L+i*(R-L)/11;}, y=function(v){return B-(v-lo)/(hi-lo)*(B-T);};
+    el(s,'rect',{x:x(8.5),y:T,width:R-x(8.5)+20,height:B-T,fill:'var(--band)'});
+    el(s,'text',{x:(x(8.5)+R+20)/2,y:T+18,'text-anchor':'middle','font-size':13},'4º trimestre');
+    [28,32,36,40].forEach(function(t){el(s,'line',{x1:L,x2:R+20,y1:y(t),y2:y(t),stroke:'var(--line)'});el(s,'text',{x:L-10,y:y(t)+4,'text-anchor':'end','font-size':13},t);});
+    var p=function(arr){return arr.map(function(v,i){return(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);}).join(' ');};
+    el(s,'path',{d:p(a),fill:'none',stroke:'var(--gray)','stroke-width':3,'stroke-linejoin':'round'});
+    el(s,'path',{d:p(b),fill:'none',stroke:'var(--accent)','stroke-width':3.5,'stroke-linejoin':'round'});
+    mn.forEach(function(m,i){el(s,'text',{x:x(i),y:B+24,'text-anchor':'middle','font-size':13},m);});
+    [10,11].forEach(function(i){
+      el(s,'text',{x:x(i),y:y(a[i])-10,'text-anchor':'middle','font-size':13},fmt(a[i],1));
+      el(s,'text',{x:x(i),y:y(b[i])+22,'text-anchor':'middle','font-size':13,style:'fill:var(--accent)'},fmt(b[i],1));
+    });
+    for(var i=0;i<12;i++){
+      var c1=el(s,'circle',{cx:x(i),cy:y(a[i]),r:4,fill:'var(--gray)'}); el(c1,'title',{},mn[i]+'/2024: Rs '+fmt(a[i],2)+' mi');
+      var c2=el(s,'circle',{cx:x(i),cy:y(b[i]),r:4.5,fill:'var(--accent)'}); el(c2,'title',{},mn[i]+'/2025: Rs '+fmt(b[i],2)+' mi ('+(b[i]>=a[i]?'+':'')+fmt((b[i]/a[i]-1)*100,1)+'%)');
+    }
+  })();
+
+  // Control chart
+  (function(){
+    var s=document.getElementById('ctrl'),net=a.concat(b),mean=33.5,ucl=38.75,lcl=28.26,lo=26,hi=41,L=50,R=880,T=16,B=260;
+    var x=function(i){return L+i*(R-L)/23;}, y=function(v){return B-(v-lo)/(hi-lo)*(B-T);};
+    el(s,'rect',{x:L,y:y(ucl),width:R-L,height:y(lcl)-y(ucl),fill:'var(--band)'});
+    el(s,'line',{x1:L,x2:R,y1:y(mean),y2:y(mean),stroke:'var(--gray)','stroke-dasharray':'6 6'});
+    el(s,'text',{x:R,y:y(ucl)-6,'text-anchor':'end','font-size':12},'Limite superior 38,7');
+    el(s,'text',{x:R,y:y(lcl)+16,'text-anchor':'end','font-size':12},'Limite inferior 28,3');
+    [28,32,36,40].forEach(function(t){el(s,'text',{x:L-10,y:y(t)+4,'text-anchor':'end','font-size':12},t);});
+    el(s,'path',{d:net.map(function(v,i){return(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);}).join(' '),fill:'none',stroke:'var(--accent)','stroke-width':2.5,'stroke-linejoin':'round'});
+    net.forEach(function(v,i){var out=v>ucl||v<lcl;var c=el(s,'circle',{cx:x(i),cy:y(v),r:out?6:3.5,fill:out?'var(--bad)':'var(--accent)'});el(c,'title',{},mn[i%12]+'/'+(i<12?'24':'25')+': Rs '+fmt(v,2)+' mi');});
+    [['jan/24',0,'start'],['jan/25',12,'middle'],['dez/25',23,'end']].forEach(function(q){el(s,'text',{x:x(q[1]),y:B+24,'text-anchor':q[2],'font-size':12},q[0]);});
+  })();
+
+  // Category table
+  var cats=[['Eletrônicos',206.7,25.7,16.4,7.1],['Casa e cozinha',147.1,18.3,22.0,4.3],['Vestuário',140.2,17.4,23.5,6.9],['Escritório',124.7,15.5,20.4,4.6],['Beleza',91.3,11.4,30.8,4.6],['Acessórios',41.0,5.1,28.0,4.4],['Brinquedos e jogos',40.2,5.0,27.0,4.6],['Papelaria',12.9,1.6,31.9,4.9]];
+  document.getElementById('catBody').innerHTML=cats.map(function(c){
+    return '<tr><td>'+c[0]+'</td><td class="n money">Rs '+fmt(c[1],1)+' mi</td><td class="n">'+fmt(c[2],1)+'%</td><td class="n'+(c[3]<18?' bad':c[3]>=28?' good':'')+'">'+fmt(c[3],1)+'%</td><td class="n'+(c[4]>=6?' bad':'')+'">'+fmt(c[4],1)+'%</td></tr>';
+  }).join('')+'<tr><td><strong>Total</strong></td><td class="n money"><strong>Rs 804,1 mi</strong></td><td class="n">100%</td><td class="n">22,3%</td><td class="n">—</td></tr>';
+
+  // Risks
+  var sev={c:['Crítico','bad'],a:['Alto','warn'],m:['Médio','flat'],b:['Baixo','flat']};
+  var risks=[["c", "Pico sazonal enfraquecido", "Q4/2025 caiu 3,5% contra Q4/2024 (nov −4,4%, dez −6,6%), justamente no trimestre mais forte do ano (índice nov 113, dez 114).", "Q4/2026 abaixo do Q4/2024 por 2 semanas seguidas", "Antecipar plano de campanha de Q4 para agosto, travar sortimento e estoque dos 5 produtos líderes e acompanhar semanalmente contra o Q4/2024."], ["a", "Receita estagnada", "Receita líquida 2025 −0,5% vs 2024; tendência mensal +0,38% com R² 0,11 (sem tendência estatística real).", "Crescimento acumulado do ano < 0% ao fim de cada trimestre", "Definir alavancas explícitas de crescimento: mix de maior margem (Beleza, Papelaria, Acessórios) e reativação de clientes dormentes."], ["a", "Perda por cancelamento e devolução", "9,2% dos pedidos são cancelados, devolvidos ou reembolsados: Rs 80,0 mi brutos em 24 meses. Eletrônicos devolve 7,1% e Vestuário 6,9%.", "Taxa de perda mensal > 10,3% (média + 2σ)", "Revisar descrição e grade de tamanhos em Vestuário, teste de qualidade nos lotes de Eletrônicos e checklist de expedição."], ["a", "Desconto corrói margem e aumenta devolução", "Margem cai de 27,2% (desconto 0–5%) para 14,8% (30–60%); devolução sobe de 4,9% para 8,5%. Corporativo recebe 14,5% de desconto médio e tem a menor margem (20,3%).", "Pedido com desconto > 20% ou margem < 10%", "Criar alçada de aprovação para desconto acima de 20% e tabela de desconto por volume para Corporativo."], ["m", "Nota baixa antecipa devolução", "Pedidos com nota ≤ 2 viram devolução em 55% dos casos (1★: 89%). Nota 5★: 0,2%.", "Avaliação ≤ 2 registrada", "Fluxo n8n: nota ≤ 2 abre chamado e contato em até 24 h para trocar antes de virar estorno."], ["m", "Dependência geográfica e de canal", "Punjab gera 51% da receita (HHI 3.508) e Online 46% (HHI 3.223). Clientes, por outro lado, são pulverizados: top 10% = 28%.", "Participação de Punjab > 55% ou queda > 5% em Punjab no mês", "Plano de expansão em Khyber Pakhtunkhwa e Islamabad (margem igual, participação de 10% e 9%)."], ["m", "Produtos em queda e possível ruptura", "Building Blocks e Travel Backpack −5,3% no ano; Smart Watch Strap −5,2% no ano e −7,4% no 2º semestre, com queda atípica em set/25 (z = −2,2).", "Unidades do produto no mês < média − 2σ", "Cruzar com estoque e lead time do fornecedor; se houve falta, ajustar ponto de pedido."], ["m", "Dependência de ticket alto", "2.807 pedidos acima de Rs 36,1 mil (outliers por IQR) somam 17,5% da receita bruta, concentrados em cadeira de escritório e air fryer.", "Queda > 10% nos pedidos acima de Rs 36 mil", "Acompanhar estoque e preço desses dois itens como itens críticos; não tratar como erro de dado."], ["m", "Base dormente", "4.997 clientes estão sem comprar há mais de 314 dias (P90 do intervalo entre compras). Retenção 2024→2025 é 82%.", "Cliente ultrapassa 314 dias sem compra", "Régua de reativação por e-mail e SMS no dia 200 e no dia 300."], ["b", "Pedidos com margem negativa", "283 pedidos com margem negativa (desconto médio 18%) e 4.186 abaixo de 10%.", "Margem do pedido < 0%", "Bloquear no checkout combinações de desconto que levem a margem negativa."], ["b", "Cobertura de dados incompleta", "25% dos pedidos sem avaliação, 8,5% sem canal de marketing, 6,6% sem forma de pagamento e 3,6% sem margem.", "Campo obrigatório nulo em > 2% das linhas do dia", "Tornar canal de marketing e pagamento obrigatórios na captura e validar no n8n antes de gravar."]];
+  document.getElementById('riskBody').innerHTML=risks.map(function(r){
+    return '<tr><td><span class="pill '+sev[r[0]][1]+'">'+sev[r[0]][0]+'</span></td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'<div class="note" style="margin-top:4px">Ação: '+r[4]+'</div></td></tr>';
+  }).join('');
+
+  function bars(id,data,hl,max){
+    document.getElementById(id).innerHTML=data.map(function(d){
+      var c=hl(d[1])?'var(--bad)':'var(--gray)';
+      return '<div class="row"><span>'+d[0]+'</span><div class="track"><div class="fill" style="width:'+Math.max(d[1]/max*100,1)+'%;background:'+c+'"></div></div><span style="text-align:right;color:'+c+'">'+fmt(d[1],1)+'%</span></div>';
+    }).join('');
+  }
+  bars('ratingBars',[['1★',89.0],['2★',48.7],['3★',10.3],['4★',1.4],['5★',0.2]],function(v){return v>30;},100);
+  bars('discBars',[['0–5%',27.2],['30–60%',14.8]],function(v){return v<18;},30);
+})();
+</script>
+</body>
+</html>
